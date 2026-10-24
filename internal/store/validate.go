@@ -86,6 +86,10 @@ func ValidateServer(server Server) error {
 		if server.Kind != Jellyfin {
 			problems = append(problems, errors.New("only a Jellyfin server can be signed in with a Jellyfin account"))
 		}
+	case AuthNavidromeSignIn:
+		if server.Kind != Navidrome {
+			problems = append(problems, errors.New("only a Navidrome server can be signed in with a Navidrome account"))
+		}
 	default:
 		problems = append(problems, fmt.Errorf("unknown auth %q", server.Auth))
 	}

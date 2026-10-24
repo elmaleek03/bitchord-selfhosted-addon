@@ -25,18 +25,20 @@ const FileName = "addon.json"
 type Kind string
 
 const (
-	Plex     Kind = "plex"
-	Jellyfin Kind = "jellyfin"
+	Plex      Kind = "plex"
+	Jellyfin  Kind = "jellyfin"
+	Navidrome Kind = "navidrome"
 )
 
-var Kinds = []Kind{Plex, Jellyfin}
+var Kinds = []Kind{Plex, Jellyfin, Navidrome}
 
 type Auth string
 
 const (
-	AuthToken          Auth = "token"
-	AuthPlexSignIn     Auth = "plex-signin"
-	AuthJellyfinSignIn Auth = "jellyfin-signin"
+	AuthToken           Auth = "token"
+	AuthPlexSignIn      Auth = "plex-signin"
+	AuthJellyfinSignIn  Auth = "jellyfin-signin"
+	AuthNavidromeSignIn Auth = "navidrome-signin"
 )
 
 type Server struct {
@@ -209,6 +211,31 @@ func (s *Store) UpdateServer(slug string, change func(*Server) error) error {
 	})
 }
 
+// EnsureNavidrome adds a Navidrome server for url with the given credential
+// unless a Navidrome server already points at that url, so a credential set in
+// the environment seeds the first run without ever overwriting a server the
+// user edited on the setup page. It reports whether it added one.
+func (s *Store) EnsureNavidrome(url, credential, account string) (bool, error) {
+	added := false
+	err := s.Update(func(data *Snapshot) error {
+		for _, server := range data.Servers {
+			if server.Kind == Navidrome && server.URL == url {
+				return nil
+			}
+		}
+		server := Server{
+			Kind: Navidrome, URL: url, Token: credential,
+			Auth: AuthNavidromeSignIn, Account: account, Enabled: true,
+			Created: time.Now().UTC().Truncate(time.Second),
+		}
+		server.Slug = nextSlug(server.Kind, data.Servers)
+		data.Servers = append(data.Servers, server)
+		added = true
+		return nil
+	})
+	return added, err
+}
+
 func (s *Store) RemoveServer(slug string) error {
 	return s.Update(func(data *Snapshot) error {
 		before := len(data.Servers)
@@ -244,7 +271,7 @@ func (s *Store) SetAdmin(admin *Admin) error {
 
 var ErrNoServer = errors.New("no such server")
 
-var slugPattern = regexp.MustCompile(`^(plex|jellyfin)-[1-9][0-9]*$`)
+var slugPattern = regexp.MustCompile(`^(plex|jellyfin|navidrome)-[1-9][0-9]*$`)
 
 func nextSlug(kind Kind, servers []Server) string {
 	taken := map[string]bool{}

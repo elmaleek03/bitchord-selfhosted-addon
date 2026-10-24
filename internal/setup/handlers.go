@@ -320,13 +320,15 @@ func (a *app) resolveServer(ctx context.Context, form submitted, existing store.
 			return server, giveBack, fmt.Errorf("the sign-in belongs to %s, not %s; sign in again", kindName(pending.kind), kindName(server.Kind))
 		}
 		server.Token, server.Account, server.DeviceID = pending.token, pending.account, pending.deviceID
-		server.Auth = map[store.Kind]store.Auth{store.Plex: store.AuthPlexSignIn, store.Jellyfin: store.AuthJellyfinSignIn}[server.Kind]
+		server.Auth = map[store.Kind]store.Auth{store.Plex: store.AuthPlexSignIn, store.Jellyfin: store.AuthJellyfinSignIn, store.Navidrome: store.AuthNavidromeSignIn}[server.Kind]
 	case form.token != "":
 		server.Token, server.Account, server.DeviceID, server.Auth = form.token, "", "", store.AuthToken
 	case existing.Token == "":
 		return server, giveBack, errors.New("sign in or paste a token")
 	case existing.Auth == store.AuthJellyfinSignIn && existing.URL != server.URL:
 		return server, giveBack, errors.New("the Jellyfin sign-in belongs to the old address, sign in again")
+	case existing.Auth == store.AuthNavidromeSignIn && existing.URL != server.URL:
+		return server, giveBack, errors.New("the Navidrome sign-in belongs to the old address, sign in again")
 	}
 	ctx, cancel := context.WithTimeout(ctx, probeTimeout)
 	defer cancel()
@@ -543,6 +545,54 @@ func (a *app) jellyfinSignIn(w http.ResponseWriter, r *http.Request) {
 	a.signins.reset(req.URL)
 	ref := a.refs.put(store.Jellyfin, account.Token, account.Username, account.DeviceID)
 	a.Log.Info("jellyfin sign-in completed", "host", hostOf(req.URL), "username", account.Username)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "username": account.Username, "ref": ref})
+}
+
+type navidromeSignInRequest struct {
+	URL      string `json:"url"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// navidromeSignIn verifies a Navidrome username and password against its
+// Subsonic API and remembers the credential for the "Paste a token/sign in"
+// tab. Navidrome offers no separate API token, so the pair is stored as the
+// server's token once the form is saved.
+func (a *app) navidromeSignIn(w http.ResponseWriter, r *http.Request) {
+	var req navidromeSignInRequest
+	if err := readJSON(r, &req); err != nil {
+		jsonError(w, http.StatusBadRequest, "malformed request")
+		return
+	}
+	req.URL = strings.TrimRight(strings.TrimSpace(req.URL), "/")
+	if err := store.ValidateServerURL(req.URL); err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if req.Username == "" || req.Password == "" {
+		jsonError(w, http.StatusBadRequest, "a username and password are required")
+		return
+	}
+	if !a.signins.attempt(req.URL) {
+		jsonError(w, http.StatusTooManyRequests, "too many failed sign-ins for this server, try again in a minute")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), probeTimeout)
+	defer cancel()
+	account, err := a.Registry.NavidromeSignIn(ctx, req.URL, req.Username, req.Password)
+	switch {
+	case errors.Is(err, media.ErrUnauthorized):
+		a.Log.Warn("navidrome sign-in rejected", "host", hostOf(req.URL), "username", req.Username)
+		jsonError(w, http.StatusUnauthorized, "navidrome rejected the username or password")
+		return
+	case err != nil:
+		a.signins.forgive(req.URL)
+		jsonError(w, http.StatusBadGateway, describe(err).Error())
+		return
+	}
+	a.signins.reset(req.URL)
+	ref := a.refs.put(store.Navidrome, account.Token, account.Username, "")
+	a.Log.Info("navidrome sign-in completed", "host", hostOf(req.URL), "username", account.Username)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "username": account.Username, "ref": ref})
 }
 

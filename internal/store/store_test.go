@@ -213,20 +213,59 @@ func TestRegenerateSecretAndSetAdmin(t *testing.T) {
 	}
 }
 
+func TestNavidromeServerIsAccepted(t *testing.T) {
+	s := open(t)
+	server := Server{Kind: Navidrome, Label: "Home", URL: "http://navidrome:4533", Token: "lyle:secret", Auth: AuthNavidromeSignIn, Enabled: true}
+	added, err := s.AddServer(server)
+	if err != nil {
+		t.Fatalf("Navidrome server rejected: %v", err)
+	}
+	if added.Slug != "navidrome-1" {
+		t.Fatalf("slug = %q, want navidrome-1", added.Slug)
+	}
+	// A pasted token is fine too, since Navidrome sign-in also stores a token.
+	pasted := server
+	pasted.Auth = AuthToken
+	if _, err := s.AddServer(pasted); err != nil {
+		t.Fatalf("Navidrome server with pasted token rejected: %v", err)
+	}
+}
+
+func TestEnsureNavidromeSeedsOnce(t *testing.T) {
+	s := open(t)
+	added, err := s.EnsureNavidrome("http://navidrome:4533", "lyle:secret", "lyle")
+	if err != nil || !added {
+		t.Fatalf("first seed added=%v err=%v", added, err)
+	}
+	got, ok := s.Snapshot().Server("navidrome-1")
+	if !ok || got.Kind != Navidrome || got.Auth != AuthNavidromeSignIn || got.Token != "lyle:secret" || !got.Enabled {
+		t.Fatalf("seeded server = %+v ok=%v", got, ok)
+	}
+	// A second run with the same URL must not duplicate or overwrite.
+	added, err = s.EnsureNavidrome("http://navidrome:4533", "other:creds", "other")
+	if err != nil || added {
+		t.Fatalf("second seed added=%v err=%v", added, err)
+	}
+	if len(s.Snapshot().Servers) != 1 {
+		t.Fatalf("servers = %d, want 1", len(s.Snapshot().Servers))
+	}
+}
+
 func TestValidation(t *testing.T) {
 	s := open(t)
 	cases := map[string]struct {
 		change func(*Server)
 		want   string
 	}{
-		"bad url":          {func(v *Server) { v.URL = "plex:32400" }, "http or https"},
-		"no token":         {func(v *Server) { v.Token = "" }, "token or API key is required"},
-		"unknown kind":     {func(v *Server) { v.Kind = "emby" }, `unknown server kind "emby"`},
-		"unknown auth":     {func(v *Server) { v.Auth = "magic" }, `unknown auth "magic"`},
-		"auth kind clash":  {func(v *Server) { v.Auth = AuthJellyfinSignIn }, "only a Jellyfin server"},
-		"label too long":   {func(v *Server) { v.Label = strings.Repeat("é", 17) }, "at most 16 characters"},
-		"label at the cap": {func(v *Server) { v.Label = strings.Repeat("é", 16) }, ""},
-		"empty label":      {func(v *Server) { v.Label = "" }, ""},
+		"bad url":              {func(v *Server) { v.URL = "plex:32400" }, "http or https"},
+		"no token":             {func(v *Server) { v.Token = "" }, "token or API key is required"},
+		"unknown kind":         {func(v *Server) { v.Kind = "emby" }, `unknown server kind "emby"`},
+		"unknown auth":         {func(v *Server) { v.Auth = "magic" }, `unknown auth "magic"`},
+		"auth kind clash":      {func(v *Server) { v.Auth = AuthJellyfinSignIn }, "only a Jellyfin server"},
+		"navidrome auth clash": {func(v *Server) { v.Auth = AuthNavidromeSignIn }, "only a Navidrome server"},
+		"label too long":       {func(v *Server) { v.Label = strings.Repeat("é", 17) }, "at most 16 characters"},
+		"label at the cap":     {func(v *Server) { v.Label = strings.Repeat("é", 16) }, ""},
+		"empty label":          {func(v *Server) { v.Label = "" }, ""},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

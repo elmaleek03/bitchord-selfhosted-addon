@@ -42,7 +42,7 @@ type kindOption struct {
 	Name string
 }
 
-var kindOptions = []kindOption{{store.Plex, "Plex"}, {store.Jellyfin, "Jellyfin"}}
+var kindOptions = []kindOption{{store.Plex, "Plex"}, {store.Jellyfin, "Jellyfin"}, {store.Navidrome, "Navidrome"}}
 
 func kindName(kind store.Kind) string {
 	for _, option := range kindOptions {

@@ -20,6 +20,7 @@ import (
 	"github.com/rairulyle/bitchord-selfhosted-addon/internal/server"
 	"github.com/rairulyle/bitchord-selfhosted-addon/internal/setup"
 	"github.com/rairulyle/bitchord-selfhosted-addon/internal/store"
+	"github.com/rairulyle/bitchord-selfhosted-addon/internal/subsonic"
 )
 
 var version = "dev"
@@ -94,6 +95,15 @@ func healthcheck(url string) int {
 }
 
 func serve(ctx context.Context, cfg config.Config, st *store.Store, log *slog.Logger, removed []string, listening func(net.Addr)) error {
+	if cfg.NavidromeURL != "" {
+		credential := subsonic.JoinCredential(cfg.NavidromeUsername, cfg.NavidromePassword)
+		added, err := st.EnsureNavidrome(cfg.NavidromeURL, credential, cfg.NavidromeUsername)
+		if err != nil {
+			log.Error("cannot seed the Navidrome server from the environment", "error", err.Error())
+		} else if added {
+			log.Info("seeded a Navidrome server from the environment", "host", cfg.NavidromeURL)
+		}
+	}
 	snapshot := st.Snapshot()
 	log.Info("starting", "version", version, "data", st.Path(), "servers", len(snapshot.Servers),
 		"public_url", snapshot.PublicURL, "refresh", cfg.RefreshInterval.String(), "log_level", cfg.LogLevel.String())

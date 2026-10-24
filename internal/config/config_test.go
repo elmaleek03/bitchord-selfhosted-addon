@@ -56,6 +56,30 @@ func TestLoadRejectsBadValuesAllAtOnce(t *testing.T) {
 	}
 }
 
+func TestNavidromeEnvMustBeSetTogether(t *testing.T) {
+	cfg, err := Load(env(map[string]string{
+		"NAVIDROME_URL":      "http://navidrome:4533/",
+		"NAVIDROME_USERNAME": "lyle",
+		"NAVIDROME_PASSWORD": "  spaces kept ",
+	}))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.NavidromeURL != "http://navidrome:4533" || cfg.NavidromeUsername != "lyle" || cfg.NavidromePassword != "  spaces kept " {
+		t.Fatalf("navidrome config = %+v", cfg)
+	}
+	for _, partial := range []map[string]string{
+		{"NAVIDROME_URL": "http://navidrome:4533"},
+		{"NAVIDROME_USERNAME": "lyle"},
+		{"NAVIDROME_PASSWORD": "secret"},
+		{"NAVIDROME_URL": "http://navidrome:4533", "NAVIDROME_USERNAME": "lyle"},
+	} {
+		if _, err := Load(env(partial)); err == nil || !strings.Contains(err.Error(), "must be set together") {
+			t.Fatalf("partial %v err = %v, want 'must be set together'", partial, err)
+		}
+	}
+}
+
 func TestRemovedNamesTheVariablesStillSet(t *testing.T) {
 	got := Removed(env(map[string]string{"PLEX_URL": "http://plex:32400", "ADDON_SECRET": " ", "JELLYFIN_API_KEY": "k", "PORT": "1"}))
 	if !reflect.DeepEqual(got, []string{"PLEX_URL", "JELLYFIN_API_KEY"}) {

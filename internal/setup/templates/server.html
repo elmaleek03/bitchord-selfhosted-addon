@@ -39,12 +39,19 @@
         <button type="button" id="jf-signin" class="secondary">Sign in</button>
         <p class="hint">The password is used once and never stored. The addon appears under this user's devices in Jellyfin, and this user's libraries are the ones it can see.</p>
       </div>
+      <div data-kind-panel="navidrome" {{if ne .Kind "navidrome"}}hidden{{end}}>
+        <label>Username <input type="text" id="nd-username" autocomplete="off"></label>
+        <label>Password <input type="password" id="nd-password" autocomplete="off"></label>
+        <button type="button" id="nd-signin" class="secondary">Sign in</button>
+        <p class="hint">Uses Navidrome's Subsonic API. The username and password are checked once and stored to stream your library; use a dedicated Navidrome user if you prefer.</p>
+      </div>
     </div>
 
     <div class="panel" data-panel="token" id="panel-token" role="tabpanel" hidden>
       <label><span id="token-label">Plex token</span> <input type="password" name="token" id="token" autocomplete="off" placeholder="{{if .Editing}}leave empty to keep the stored token{{end}}"></label>
       <p class="hint" data-kind-panel="plex" {{if ne .Kind "plex"}}hidden{{end}}>In Plex Web, open any item, choose Get Info, then View XML. The address ends with <code>X-Plex-Token=</code> and the token.</p>
       <p class="hint" data-kind-panel="jellyfin" {{if ne .Kind "jellyfin"}}hidden{{end}}>In Jellyfin, open Dashboard, then API Keys under Advanced, and add a key. An API key sees every library.</p>
+      <p class="hint" data-kind-panel="navidrome" {{if ne .Kind "navidrome"}}hidden{{end}}>Enter your Navidrome username and password above and press Sign in. Navidrome has no separate API token.</p>
     </div>
   </fieldset>
 
@@ -73,9 +80,9 @@
 (function () {
   var form = document.getElementById('server-form');
   var csrf = form.dataset.csrf;
-  var names = { plex: 'Plex', jellyfin: 'Jellyfin' };
-  var tokenLabels = { plex: 'Plex token', jellyfin: 'Jellyfin API key' };
-  var urlPlaceholders = { plex: 'http://plex:32400', jellyfin: 'http://jellyfin:8096' };
+  var names = { plex: 'Plex', jellyfin: 'Jellyfin', navidrome: 'Navidrome' };
+  var tokenLabels = { plex: 'Plex token', jellyfin: 'Jellyfin API key', navidrome: 'Navidrome user:password' };
+  var urlPlaceholders = { plex: 'http://plex:32400', jellyfin: 'http://jellyfin:8096', navidrome: 'http://navidrome:4533' };
   var result = document.getElementById('test-result');
 
   function kind() {
@@ -190,6 +197,25 @@
     result.textContent = 'Signing in…';
     result.className = 'hint';
     post('/setup/jellyfin/signin', { url: document.getElementById('url').value, username: document.getElementById('jf-username').value, password: password.value })
+      .then(function (answer) {
+        password.value = '';
+        if (!answer.ok) { result.textContent = answer.error; result.className = 'error'; return; }
+        document.getElementById('token_ref').value = answer.ref;
+        signedIn(answer.username);
+        document.getElementById('test').click();
+      })
+      .catch(function (error) {
+        password.value = '';
+        result.textContent = friendly(error, 'The addon did not answer.');
+        result.className = 'error';
+      });
+  });
+
+  document.getElementById('nd-signin').addEventListener('click', function () {
+    var password = document.getElementById('nd-password');
+    result.textContent = 'Signing in…';
+    result.className = 'hint';
+    post('/setup/navidrome/signin', { url: document.getElementById('url').value, username: document.getElementById('nd-username').value, password: password.value })
       .then(function (answer) {
         password.value = '';
         if (!answer.ok) { result.textContent = answer.error; result.className = 'error'; return; }

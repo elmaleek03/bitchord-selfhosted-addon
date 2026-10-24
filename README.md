@@ -1,7 +1,15 @@
 <h1 align="center">bitchord-selfhosted-addon</h1>
 
+> **Note:** This repository is a fork of
+> [rairulyle/bitchord-selfhosted-addon](https://github.com/rairulyle/bitchord-selfhosted-addon)
+> ([elmaleek03/bitchord-selfhosted-addon](https://github.com/elmaleek03/bitchord-selfhosted-addon))
+> that **adds Navidrome support** via its Subsonic API. Upstream only supports
+> Plex and Jellyfin. Navidrome servers are added on the setup page, or seeded
+> from the environment with `NAVIDROME_URL`, `NAVIDROME_USERNAME` and
+> `NAVIDROME_PASSWORD`.
+
 <p align="center">
-  Play your own Plex and Jellyfin music libraries inside BitChord.
+  Play your own Plex, Jellyfin and Navidrome music libraries inside BitChord.
 </p>
 
 <div align="center">
@@ -10,9 +18,9 @@
 
 ## 🎵 What it is
 
-A small self-hosted server that adds your Plex and Jellyfin music libraries
-to BitChord (Android) as sources. BitChord searches your library through the
-addon and streams your original files.
+A small self-hosted server that adds your Plex, Jellyfin and Navidrome music
+libraries to BitChord (Android) as sources. BitChord searches your library
+through the addon and streams your original files.
 
 BitChord prefers addons you add over its built-in sources, so when a song is
 in your library, your own copy plays.

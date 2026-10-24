@@ -16,6 +16,13 @@ type Config struct {
 	Port            int
 	LogLevel        slog.Level
 	LogFormat       string
+	// NavidromeURL, NavidromeUsername and NavidromePassword seed one Navidrome
+	// server on startup when all three are set. They are a convenience for a
+	// first run; servers added on the setup page still take precedence and are
+	// never overwritten by them.
+	NavidromeURL      string
+	NavidromeUsername string
+	NavidromePassword string
 }
 
 var logLevels = map[string]slog.Level{
@@ -67,6 +74,19 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.LogFormat = strings.ToLower(get("LOG_FORMAT", "text"))
 	if cfg.LogFormat != "text" && cfg.LogFormat != "json" {
 		fail("LOG_FORMAT must be text or json")
+	}
+
+	cfg.NavidromeURL = strings.TrimRight(get("NAVIDROME_URL", ""), "/")
+	cfg.NavidromeUsername = get("NAVIDROME_USERNAME", "")
+	cfg.NavidromePassword = getenv("NAVIDROME_PASSWORD") // not trimmed: spaces can be part of a password
+	set := 0
+	for _, v := range []string{cfg.NavidromeURL, cfg.NavidromeUsername, cfg.NavidromePassword} {
+		if v != "" {
+			set++
+		}
+	}
+	if set != 0 && set != 3 {
+		fail("NAVIDROME_URL, NAVIDROME_USERNAME and NAVIDROME_PASSWORD must be set together")
 	}
 
 	return cfg, errors.Join(problems...)

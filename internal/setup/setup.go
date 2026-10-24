@@ -44,6 +44,7 @@ type Runtime interface {
 	PlexServers(ctx context.Context, token string) ([]registry.PlexServer, error)
 	JellyfinSignIn(ctx context.Context, serverURL, username, password string) (registry.Account, error)
 	JellyfinSignOut(ctx context.Context, serverURL, deviceID, token string) error
+	NavidromeSignIn(ctx context.Context, serverURL, username, password string) (registry.Account, error)
 	TokenInUse(slug, token string) (bool, <-chan struct{})
 }
 
@@ -164,6 +165,7 @@ func (a *app) handler() http.Handler {
 	mux.HandleFunc("POST /setup/plex/pin", a.plexPIN)
 	mux.HandleFunc("GET /setup/plex/pin/{id}", a.plexPoll)
 	mux.HandleFunc("POST /setup/jellyfin/signin", a.jellyfinSignIn)
+	mux.HandleFunc("POST /setup/navidrome/signin", a.navidromeSignIn)
 	mux.HandleFunc("/setup/", func(w http.ResponseWriter, _ *http.Request) { http.Error(w, "not found", http.StatusNotFound) })
 
 	outer := http.NewServeMux()
